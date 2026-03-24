@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build SFML Game",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "main.cpp",
+                "Game.cpp",
+                "-o",
+                "game",
+                "-std=c++17",
+                "-I/opt/homebrew/include",
+                "-L/opt/homebrew/lib",
+                "-lsfml-graphics",
+                "-lsfml-window",
+                "-lsfml-system"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}
