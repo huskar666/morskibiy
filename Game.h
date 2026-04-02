@@ -35,5 +35,4 @@ private:
     void computerMove();
     void checkWin();
 };
-
 #endif
