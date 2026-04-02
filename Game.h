@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include <SFML/Graphics.hpp>
+#include <SFML/System.hpp>
 #include <vector>
 
 class Game {
@@ -29,7 +30,12 @@ private:
     bool gameOver = false;
     bool playerWon = false;
 
+    sf::Clock botTimer;
+    std::vector<sf::Vector2i> botTargets; 
+
     void generateField(unsigned char field[SIZE][SIZE]);
+    bool canPlaceShip(unsigned char field[SIZE][SIZE], int x, int y, int length, bool horizontal);
+    void placeShip(unsigned char field[SIZE][SIZE], int length);
     void drawField(unsigned char field[SIZE][SIZE], int offsetX, bool hideShips);
     void handleShot(int x, int y, unsigned char field[SIZE][SIZE]);
     void computerMove();
