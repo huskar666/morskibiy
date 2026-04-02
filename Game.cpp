@@ -45,7 +45,7 @@ void Game::processEvents() {
         if (!gameOver && playerTurn) {
             if (const auto* mousePress = event->getIf<sf::Event::MouseButtonPressed>()) {
                 if (mousePress->button == sf::Mouse::Button::Left) {
-                    int x = (mousePress->position.x - 550) / cellSize;
+                    int x = (mousePress->position.x - 517) / cellSize;
                     int y = (mousePress->position.y - 100) / cellSize;
                     
                     if (x >= 0 && x < SIZE && y >= 0 && y < SIZE) {
@@ -230,8 +230,8 @@ void Game::drawField(unsigned char field[SIZE][SIZE], int offsetX, bool hideShip
 
 void Game::render() {
     window.clear();
-    drawField(playerField, 50, false);
-    drawField(enemyField, 550, true);
+    drawField(playerField, 33, false);
+    drawField(enemyField, 517, true);
     if (gameOver) {
         text.setString(playerWon ? "YOU WIN! Press R" : "GAME OVER! Press R");
         shadow.setString(text.getString());
