@@ -4,6 +4,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <vector>
+using namespace std;
 
 class Game {
 public:
@@ -11,34 +12,35 @@ public:
     void run();
 
 private:
-    void processEvents();
-    void update();
+    void obrobkaPodiy();
+    void onovlennya();
     void render();
     
-    static const int SIZE = 10;
-    const int cellSize;
+    static const int SIZE =10;
+    const int rozmirKlitky;
     
     sf::RenderWindow window;
     sf::Font font;
     sf::Text text;
     sf::Text shadow;
 
-    unsigned char playerField[SIZE][SIZE];
-    unsigned char enemyField[SIZE][SIZE];
+    unsigned char poleGrav[SIZE][SIZE];
+    unsigned char poleVor[SIZE][SIZE];
 
-    bool playerTurn = true;
-    bool gameOver = false;
-    bool playerWon = false;
+    bool hidGrav = true;
+    bool kinetsHry = false;
+    bool gravPeremih = false;
 
     sf::Clock botTimer;
-    std::vector<sf::Vector2i> botTargets; 
+    vector<sf::Vector2i>botCili; 
 
-    void generateField(unsigned char field[SIZE][SIZE]);
-    bool canPlaceShip(unsigned char field[SIZE][SIZE], int x, int y, int length, bool horizontal);
-    void placeShip(unsigned char field[SIZE][SIZE], int length);
-    void drawField(unsigned char field[SIZE][SIZE], int offsetX, bool hideShips);
-    void handleShot(int x, int y, unsigned char field[SIZE][SIZE]);
-    void computerMove();
-    void checkWin();
+    void zgenPole(unsigned char pole[SIZE][SIZE]);
+    bool mozhnaKorabl(unsigned char pole[SIZE][SIZE], int x, int y, int dovzh, bool horiz);
+    void postavytyKorabl(unsigned char pole[SIZE][SIZE],int dovzh);
+    void namalyuvatyPole(unsigned char pole[SIZE][SIZE], int zsuVx, bool pryhovaty);
+    void postril(int x, int y, unsigned char pole[SIZE][SIZE]);
+    void hidBota();
+    void perevirkaPeremohy();
 };
+
 #endif

@@ -5,53 +5,56 @@
 #include <optional>
 #include <algorithm>
 
-enum Cell { EMPTY = 0, SHIP = 1, MISS = 2, HIT = 3 };
+using namespace sf;
+using namespace std;
+
+enum Klitka { porozhno = 0, korabl = 1, mimo = 2, vlupleno = 3 };
 
 Game::Game() 
-    : window(sf::VideoMode({1000, 600}), "Sea Battle"), 
-      cellSize(45),
+    : window(VideoMode({1000, 600}), "Sea Battle"), 
+      rozmirKlitky(45),
       text(font), 
       shadow(font)
 {
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+    srand(static_cast<unsigned int>(time(nullptr)));
 
     if (!font.openFromFile("Fonts/ArialRegular.ttf")) {
-        std::cerr << "Error: ArialRegular.ttf not found!\n";
+        cerr << "Error: ArialRegular.ttf not found!\n";
         exit(1);
     }
 
     text.setCharacterSize(60);
     shadow.setCharacterSize(60);
-    shadow.setFillColor(sf::Color::Black);
+    shadow.setFillColor(Color(30, 30, 30));
 
-    generateField(playerField);
-    generateField(enemyField);
+    zgenPole(poleGrav);
+    zgenPole(poleVor);
 }
 
 void Game::run() {
     while (window.isOpen()) {
-        processEvents();
-        update();
+        obrobkaPodiy();
+        onovlennya();
         render();
     }
 }
 
-void Game::processEvents() {
-    while (const std::optional event = window.pollEvent()) {
-        if (event->is<sf::Event::Closed>()) {
+void Game::obrobkaPodiy() {
+    while (const optional event = window.pollEvent()) {
+        if (event->is<Event::Closed>()) {
             window.close();
         }
 
-        if (!gameOver && playerTurn) {
-            if (const auto* mousePress = event->getIf<sf::Event::MouseButtonPressed>()) {
-                if (mousePress->button == sf::Mouse::Button::Left) {
-                    int x = (mousePress->position.x - 517) / cellSize;
-                    int y = (mousePress->position.y - 100) / cellSize;
-                    
+        if (!kinetsHry && hidGrav) {
+            if (const auto* mouse = event->getIf<Event::MouseButtonPressed>()) {
+                if (mouse->button == Mouse::Button::Left) {
+                    int x = (mouse->position.x - 517) / rozmirKlitky;
+                    int y = (mouse->position.y - 100) / rozmirKlitky;
+
                     if (x >= 0 && x < SIZE && y >= 0 && y < SIZE) {
-                        if (enemyField[x][y] == EMPTY || enemyField[x][y] == SHIP) {
-                            handleShot(x, y, enemyField);
-                            playerTurn = false;
+                        if (poleVor[x][y] == porozhno || poleVor[x][y] == korabl) {
+                            postril(x, y, poleVor);
+                            hidGrav = false;
                             botTimer.restart();
                         }
                     }
@@ -59,187 +62,226 @@ void Game::processEvents() {
             }
         }
 
-        if (gameOver) {
-            if (const auto* keyPress = event->getIf<sf::Event::KeyPressed>()) {
-                if (keyPress->code == sf::Keyboard::Key::R) {
-                    generateField(playerField);
-                    generateField(enemyField);
-                    botTargets.clear();
-                    gameOver = false;
-                    playerTurn = true;
+        if (kinetsHry) {
+            if (const auto* key = event->getIf<Event::KeyPressed>()) {
+                if (key->code == Keyboard::Key::R) {
+                    zgenPole(poleGrav);
+                    zgenPole(poleVor);
+                    botCili.clear();
+                    kinetsHry = false;
+                    hidGrav = true;
                 }
             }
         }
     }
 }
 
-void Game::update() {
-    if (!playerTurn && !gameOver) {
+void Game::onovlennya() {
+    if (!hidGrav && !kinetsHry) {
         if (botTimer.getElapsedTime().asSeconds() >= 2.0f) {
-            computerMove();
-            playerTurn = true;
+            hidBota();
+            hidGrav = true;
         }
     }
-    checkWin();
+    perevirkaPeremohy();
 }
 
-void Game::handleShot(int x, int y, unsigned char field[SIZE][SIZE]) {
-    if (field[x][y] == SHIP) field[x][y] = HIT;
-    else if (field[x][y] == EMPTY) field[x][y] = MISS;
+void Game::postril(int x, int y, unsigned char pole[SIZE][SIZE]) {
+    if (pole[x][y] == korabl) pole[x][y] = vlupleno;
+    else if (pole[x][y] == porozhno) pole[x][y] = mimo;
 }
 
-void Game::checkWin() {
-    bool playerAlive = false;
-    bool enemyAlive = false;
+void Game::perevirkaPeremohy() {
+    bool gravZhiv = false;
+    bool vorZhiv = false;
+
     for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
-            if (playerField[i][j] == SHIP) playerAlive = true;
-            if (enemyField[i][j] == SHIP) enemyAlive = true;
+            if (poleGrav[i][j] == korabl) gravZhiv = true;
+            if (poleVor[i][j] == korabl) vorZhiv = true;
         }
     }
-    if (!enemyAlive) { gameOver = true; playerWon = true; }
-    else if (!playerAlive) { gameOver = true; playerWon = false; }
+
+    if (!vorZhiv) { kinetsHry = true; gravPeremih = true; }
+    else if (!gravZhiv) { kinetsHry = true; gravPeremih = false; }
 }
 
-void Game::computerMove() {
+void Game::hidBota() {
     int x = -1, y = -1;
-    bool validShot = false;
+    bool valid = false;
 
-    while (!botTargets.empty() && !validShot) {
-        sf::Vector2i target = botTargets.back();
-        botTargets.pop_back();
+    while (!botCili.empty() && !valid) {
+        Vector2i t = botCili.back();
+        botCili.pop_back();
 
-        if (target.x >= 0 && target.x < SIZE && target.y >= 0 && target.y < SIZE) {
-            if (playerField[target.x][target.y] == EMPTY || playerField[target.x][target.y] == SHIP) {
-                x = target.x;
-                y = target.y;
-                validShot = true;
+        if (t.x >= 0 && t.x < SIZE && t.y >= 0 && t.y < SIZE) {
+            if (poleGrav[t.x][t.y] == porozhno || poleGrav[t.x][t.y] == korabl) {
+                x = t.x;
+                y = t.y;
+                valid = true;
             }
         }
     }
 
-    if (!validShot) {
+    if (!valid) {
         do {
-            x = std::rand() % SIZE;
-            y = std::rand() % SIZE;
-        } while (playerField[x][y] == MISS || playerField[x][y] == HIT);
+            x = rand() % SIZE;
+            y = rand() % SIZE;
+        } while (poleGrav[x][y] == mimo || poleGrav[x][y] == vlupleno);
     }
 
-    bool wasHit = (playerField[x][y] == SHIP);
-    handleShot(x, y, playerField);
+    bool hit = (poleGrav[x][y] == korabl);
+    postril(x, y, poleGrav);
 
-    if (wasHit) {
-        std::vector<sf::Vector2i> hits;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (playerField[i][j] == HIT) {
+    if (hit) {
+        vector<Vector2i> hits;
+        for (int i = 0; i < SIZE; i++)
+            for (int j = 0; j < SIZE; j++)
+                if (poleGrav[i][j] == vlupleno)
                     hits.push_back({i, j});
-                }
-            }
-        }
-                if (hits.size() == 1) {
-            botTargets.push_back({x + 1, y});
-            botTargets.push_back({x - 1, y});
-            botTargets.push_back({x, y + 1});
-            botTargets.push_back({x, y - 1});
-        } 
-        else if (hits.size() > 1) {
-            botTargets.clear();
-            bool horizontal = hits[0].y == hits[1].y;
-            
-            int minX = 10, maxX = -1, minY = 10, maxY = -1;
-            for(auto& h : hits) {
-                minX = std::min(minX, h.x); maxX = std::max(maxX, h.x);
-                minY = std::min(minY, h.y); maxY = std::max(maxY, h.y);
-            }
 
-            if (horizontal) {
-                botTargets.push_back({minX - 1, minY});
-                botTargets.push_back({maxX + 1, minY});
+        if (hits.size() == 1) {
+            botCili.push_back({x + 1, y});
+            botCili.push_back({x - 1, y});
+            botCili.push_back({x, y + 1});
+            botCili.push_back({x, y - 1});
+        } 
+        else {
+            botCili.clear();
+            bool horiz = hits[0].y == hits[1].y;
+            int minX = 10, maxX = -1, minY = 10, maxY = -1;
+            for (auto& h : hits) {
+                minX = min(minX, h.x);
+                maxX = max(maxX, h.x);
+                minY = min(minY, h.y);
+                maxY = max(maxY, h.y);
+            }
+            if (horiz) {
+                botCili.push_back({minX - 1, minY});
+                botCili.push_back({maxX + 1, minY});
             } else {
-                botTargets.push_back({minX, minY - 1});
-                botTargets.push_back({minX, maxY + 1});
+                botCili.push_back({minX, minY - 1});
+                botCili.push_back({minX, maxY + 1});
             }
         }
     }
 }
 
-bool Game::canPlaceShip(unsigned char field[SIZE][SIZE], int x, int y, int length, bool horizontal) {
-    if (horizontal) {
-        if (x + length > SIZE) return false;
+bool Game::mozhnaKorabl(unsigned char pole[SIZE][SIZE], int x, int y, int dovzh, bool horiz) {
+    if (horiz) {
+        if (x + dovzh > SIZE) return false;
     } else {
-        if (y + length > SIZE) return false;
+        if (y + dovzh > SIZE) return false;
     }
 
-    int startX = std::max(0, x - 1);
-    int startY = std::max(0, y - 1);
-    int endX = std::min(SIZE - 1, x + (horizontal ? length : 1));
-    int endY = std::min(SIZE - 1, y + (horizontal ? 1 : length));
+    int sx = max(0, x - 1);
+    int sy = max(0, y - 1);
+    int ex = min(SIZE - 1, x + (horiz ? dovzh : 1));
+    int ey = min(SIZE - 1, y + (horiz ? 1 : dovzh));
 
-    for (int i = startX; i <= endX; i++) {
-        for (int j = startY; j <= endY; j++) {
-            if (field[i][j] != EMPTY) return false;
-        }
-    }
+    for (int i = sx; i <= ex; i++)
+        for (int j = sy; j <= ey; j++)
+            if (pole[i][j] != porozhno)
+                return false;
+
     return true;
 }
 
-void Game::placeShip(unsigned char field[SIZE][SIZE], int length) {
-    bool placed = false;
-    while (!placed) {
-        int x = std::rand() % SIZE;
-        int y = std::rand() % SIZE;
-        bool horizontal = std::rand() % 2;
-
-        if (canPlaceShip(field, x, y, length, horizontal)) {
-            for (int i = 0; i < length; i++) {
-                if (horizontal) field[x + i][y] = SHIP;
-                else field[x][y + i] = SHIP;
+void Game::postavytyKorabl(unsigned char pole[SIZE][SIZE], int dovzh) {
+    bool ok = false;
+    while (!ok) {
+        int x = rand() % SIZE;
+        int y = rand() % SIZE;
+        bool horiz = rand() % 2;
+        if (mozhnaKorabl(pole, x, y, dovzh, horiz)) {
+            for (int i = 0; i < dovzh; i++) {
+                if (horiz) pole[x + i][y] = korabl;
+                else pole[x][y + i] = korabl;
             }
-            placed = true;
+            ok = true;
         }
     }
 }
 
-void Game::generateField(unsigned char field[SIZE][SIZE]) {
+void Game::zgenPole(unsigned char pole[SIZE][SIZE]) {
     for (int i = 0; i < SIZE; i++)
         for (int j = 0; j < SIZE; j++)
-            field[i][j] = EMPTY;
+            pole[i][j] = porozhno;
 
-    int shipSizes[] = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
-    for (int length : shipSizes) {
-        placeShip(field, length);
-    }
+    int rozmiary[] = {4,3,3,2,2,2,1,1,1,1};
+    for (int d : rozmiary)
+        postavytyKorabl(pole, d);
 }
 
-void Game::drawField(unsigned char field[SIZE][SIZE], int offsetX, bool hideShips) {
+void Game::namalyuvatyPole(unsigned char pole[SIZE][SIZE], int zsuVx, bool pryhovaty) {
     for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
-            sf::RectangleShape cell({static_cast<float>(cellSize - 2), static_cast<float>(cellSize - 2)});
-            cell.setPosition({static_cast<float>(offsetX + i * cellSize), static_cast<float>(100 + j * cellSize)});
+            float posX = static_cast<float>(zsuVx + i * rozmirKlitky);
+            float posY = static_cast<float>(100 + j * rozmirKlitky);
 
-            if (field[i][j] == EMPTY) cell.setFillColor(sf::Color::White);
-            else if (field[i][j] == SHIP && !hideShips) cell.setFillColor(sf::Color::Green);
-            else if (field[i][j] == MISS) cell.setFillColor(sf::Color::Blue);
-            else if (field[i][j] == HIT) cell.setFillColor(sf::Color::Red);
+            RectangleShape klitka({
+                static_cast<float>(rozmirKlitky - 2),
+                static_cast<float>(rozmirKlitky - 2)
+            });
 
-            window.draw(cell);
+            klitka.setPosition({posX, posY});
+
+            if (pole[i][j] == porozhno || (pole[i][j] == korabl && pryhovaty)) {
+                klitka.setFillColor(Color(255, 255, 255, 200));
+            }
+            else if (pole[i][j] == korabl && !pryhovaty) {
+                klitka.setFillColor(Color(46, 204, 113));
+            }
+            else if (pole[i][j] == mimo) {
+                klitka.setFillColor(Color(52, 152, 219));
+            }
+            else if (pole[i][j] == vlupleno) {
+                klitka.setFillColor(Color(255, 255, 255, 150));
+            }
+
+            window.draw(klitka);
+
+            if (pole[i][j] == vlupleno) {
+                RectangleShape line1(Vector2f(static_cast<float>(rozmirKlitky) * 1.1f, 6.f));
+                line1.setFillColor(Color(231, 76, 60));
+                line1.setOrigin({line1.getSize().x / 2.f, line1.getSize().y / 2.f});
+                line1.setPosition({posX + (rozmirKlitky - 2) / 2.f, posY + (rozmirKlitky - 2) / 2.f});
+                line1.setRotation(degrees(45));
+
+                RectangleShape line2(Vector2f(static_cast<float>(rozmirKlitky) * 1.1f, 6.f));
+                line2.setFillColor(Color(231, 76, 60));
+                line2.setOrigin({line2.getSize().x / 2.f, line2.getSize().y / 2.f});
+                line2.setPosition({posX + (rozmirKlitky - 2) / 2.f, posY + (rozmirKlitky - 2) / 2.f});
+                line2.setRotation(degrees(-45));
+
+                window.draw(line1);
+                window.draw(line2);
+            }
         }
     }
 }
 
 void Game::render() {
-    window.clear();
-    drawField(playerField, 33, false);
-    drawField(enemyField, 517, true);
-    if (gameOver) {
-        text.setString(playerWon ? "YOU WIN! Press R" : "GAME OVER! Press R");
+    window.clear(Color(45, 52, 54));
+
+    namalyuvatyPole(poleGrav, 33, false);
+    namalyuvatyPole(poleVor, 517, true);
+
+    if (kinetsHry) {
+        text.setString(gravPeremih ? "YOU WIN! Press R" : "GAME OVER! Press R");
         shadow.setString(text.getString());
-        sf::Vector2f textPos = { (window.getSize().x - text.getLocalBounds().size.x) / 2.f, 250.f };
-        text.setPosition(textPos);
-        shadow.setPosition(textPos + sf::Vector2f{3.f, 3.f});
+
+        Vector2f pos = {
+            (window.getSize().x - text.getLocalBounds().size.x) / 2.f,
+            250.f
+        };
+
+        text.setPosition(pos);
+        shadow.setPosition(pos + Vector2f{3.f, 3.f});
+
         window.draw(shadow);
         window.draw(text);
     }
+
     window.display();
 }
